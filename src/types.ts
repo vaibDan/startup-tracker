@@ -18,3 +18,18 @@ export interface Startup {
   lastContactDate: string;
   notes: string;
 }
+
+export type ConnectionStatus = 'Not Connected' | 'Request Sent' | 'Connected';
+export type DMStatus = 'Not Messaged' | 'Pitch Sent' | 'Replied' | 'Followed Up';
+
+export interface Contact {
+  id: string;
+  name: string;
+  title: string;
+  companyId: string; // Foreign key linking to Startup.id
+  linkedin: string;
+  connectionStatus: ConnectionStatus;
+  dmStatus: DMStatus;
+  lastInteractionDate: string; // YYYY-MM-DD
+  notes: string;
+}

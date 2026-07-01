@@ -18,28 +18,21 @@ import {
   ChevronDown, 
   ChevronsUpDown, 
   AlertCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserCheck,
+  MessageSquare,
+  Network
 } from 'lucide-react';
-import type { Startup, RoleRelevance, OutreachStatus } from './types';
-
-const LinkedInIcon = ({ size = 16 }: { size?: number }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="currentColor"
-    style={{ display: 'inline-block', verticalAlign: 'middle' }}
-  >
-    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
-  </svg>
-);
-import { seedStartups } from './seedData';
+import type { Startup, Contact, RoleRelevance, OutreachStatus, ConnectionStatus, DMStatus } from './types';
+import { seedStartups, seedContacts } from './seedData';
 import './App.css';
 
-const LOCAL_STORAGE_KEY = 'indisight_startups';
+const LOCAL_STORAGE_KEY_STARTUPS = 'indisight_startups';
+const LOCAL_STORAGE_KEY_CONTACTS = 'indisight_contacts';
 const THEME_KEY = 'indisight_theme';
 
-const initialFormState = {
+// Initial state forms
+const initialStartupFormState = {
   company: '',
   url: '',
   description: '',
@@ -56,18 +49,55 @@ const initialFormState = {
   notes: ''
 };
 
+const initialContactFormState = {
+  name: '',
+  title: '',
+  companyId: '',
+  linkedin: '',
+  connectionStatus: 'Not Connected' as ConnectionStatus,
+  dmStatus: 'Not Messaged' as DMStatus,
+  lastInteractionDate: new Date().toISOString().split('T')[0],
+  notes: ''
+};
+
+const LinkedInIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill="currentColor"
+    style={{ display: 'inline-block', verticalAlign: 'middle' }}
+  >
+    <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+  </svg>
+);
+
 function App() {
   // --- STATE ---
+  const [activeTab, setActiveTab] = useState<'startups' | 'contacts'>('startups');
+  
   const [startups, setStartups] = useState<Startup[]>(() => {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY_STARTUPS);
     if (stored) {
       try {
         return JSON.parse(stored);
       } catch (e) {
-        console.error('Failed to parse startups from localStorage, loading seed data.', e);
+        console.error('Failed to parse startups from localStorage.', e);
       }
     }
     return seedStartups;
+  });
+
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY_CONTACTS);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error('Failed to parse contacts from localStorage.', e);
+      }
+    }
+    return seedContacts;
   });
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -75,193 +105,205 @@ function App() {
     return stored === 'light' ? 'light' : 'dark';
   });
 
-  // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState('');
+  // --- Search & Filter State ---
+  // Startups Filters
+  const [startupSearch, setStartupSearch] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedHiring, setSelectedHiring] = useState<'all' | 'hiring' | 'not_hiring'>('all');
   const [selectedRelevance, setSelectedRelevance] = useState<'all' | 'High' | 'Medium' | 'Low'>('all');
 
-  // Sorting State
-  const [sortField, setSortField] = useState<keyof Startup | null>('company');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Contacts Filters
+  const [contactSearch, setContactSearch] = useState('');
+  const [selectedContactCompany, setSelectedContactCompany] = useState('');
+  const [selectedConnectionStatus, setSelectedConnectionStatus] = useState<'all' | ConnectionStatus>('all');
+  const [selectedDMStatus, setSelectedDMStatus] = useState<'all' | DMStatus>('all');
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // --- Sorting State ---
+  const [startupSortField, setStartupSortField] = useState<keyof Startup | null>('company');
+  const [startupSortDir, setStartupSortDir] = useState<'asc' | 'desc'>('asc');
+  
+  const [contactSortField, setContactSortField] = useState<keyof Contact | null>('name');
+  const [contactSortDir, setContactSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // --- Modal Form State ---
+  const [isStartupModalOpen, setIsStartupModalOpen] = useState(false);
   const [editingStartup, setEditingStartup] = useState<Startup | null>(null);
-  const [formState, setFormState] = useState(initialFormState);
-  const [formError, setFormError] = useState('');
+  const [startupForm, setStartupForm] = useState(initialStartupFormState);
 
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [contactForm, setContactForm] = useState(initialContactFormState);
+
+  const [formError, setFormError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- SIDE EFFECTS ---
-  // Save startups to local storage
+  // --- LOCAL STORAGE SYNCHRONIZATION ---
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(startups));
+    localStorage.setItem(LOCAL_STORAGE_KEY_STARTUPS, JSON.stringify(startups));
   }, [startups]);
 
-  // Apply theme class/attribute
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY_CONTACTS, JSON.stringify(contacts));
+  }, [contacts]);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  // --- UTILS / HANDLERS ---
+  // --- THEME HANDLER ---
   const toggleTheme = () => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // Get unique sectors dynamically from the startup data
-  const uniqueSectors = Array.from(
-    new Set(startups.map(s => s.sector.trim()).filter(Boolean))
-  ).sort();
-
-  // Handle Sort
-  const handleSort = (field: keyof Startup) => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+  // --- SORT HANDLERS ---
+  const handleStartupSort = (field: keyof Startup) => {
+    if (startupSortField === field) {
+      setStartupSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
-      setSortField(field);
-      setSortDirection('asc');
+      setStartupSortField(field);
+      setStartupSortDir('asc');
     }
   };
 
-  // Render Sort Icon
-  const renderSortIcon = (field: keyof Startup) => {
-    if (sortField !== field) {
+  const handleContactSort = (field: keyof Contact) => {
+    if (contactSortField === field) {
+      setContactSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setContactSortField(field);
+      setContactSortDir('asc');
+    }
+  };
+
+  const renderSortIcon = (activeField: string | null, targetField: string, dir: 'asc' | 'desc') => {
+    if (activeField !== targetField) {
       return <ChevronsUpDown size={14} className="sort-icon" />;
     }
-    return sortDirection === 'asc' 
+    return dir === 'asc' 
       ? <ChevronUp size={14} className="sort-icon" /> 
       : <ChevronDown size={14} className="sort-icon" />;
   };
 
-  // Delete startup
-  const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}" from the tracker?`)) {
+  // --- DELETE HANDLERS ---
+  const handleDeleteStartup = (id: string, name: string) => {
+    const linkedContacts = contacts.filter(c => c.companyId === id);
+    let confirmMsg = `Are you sure you want to delete "${name}"?`;
+    
+    if (linkedContacts.length > 0) {
+      confirmMsg = `WARNING: Deleting "${name}" will unlink ${linkedContacts.length} contacts associated with this company. Proceed anyway?`;
+    }
+
+    if (window.confirm(confirmMsg)) {
       setStartups(prev => prev.filter(s => s.id !== id));
+      // Cascade delete or clear link? Cleanest is cascading reference cleanup (setting companyId to empty)
+      setContacts(prev => prev.map(c => c.companyId === id ? { ...c, companyId: '' } : c));
     }
   };
 
-  // Edit click
-  const handleEditClick = (startup: Startup) => {
-    setEditingStartup(startup);
-    setFormState({
-      company: startup.company,
-      url: startup.url,
-      description: startup.description,
-      sector: startup.sector,
-      investor: startup.investor,
-      fundingStage: startup.fundingStage,
-      amount: startup.amount,
-      teamSize: startup.teamSize,
-      hiring: startup.hiring,
-      relevance: startup.relevance,
-      founderLinkedin: startup.founderLinkedin,
-      outreachStatus: startup.outreachStatus,
-      lastContactDate: startup.lastContactDate,
-      notes: startup.notes
-    });
-    setFormError('');
-    setIsModalOpen(true);
+  const handleDeleteContact = (id: string, name: string) => {
+    if (window.confirm(`Remove outreach contact "${name}"?`)) {
+      setContacts(prev => prev.filter(c => c.id !== id));
+    }
   };
 
-  // Add click
-  const handleAddClick = () => {
+  // --- FORM OPEN ACTIONS ---
+  const handleAddStartupClick = () => {
     setEditingStartup(null);
-    setFormState({
-      ...initialFormState,
+    setStartupForm({
+      ...initialStartupFormState,
       lastContactDate: new Date().toISOString().split('T')[0]
     });
     setFormError('');
-    setIsModalOpen(true);
+    setIsStartupModalOpen(true);
   };
 
-  // Form input changes
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormState(prev => ({ ...prev, [name]: checked }));
-    } else if (name === 'teamSize') {
-      setFormState(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
-    } else {
-      setFormState(prev => ({ ...prev, [name]: value }));
-    }
+  const handleEditStartupClick = (startup: Startup) => {
+    setEditingStartup(startup);
+    setStartupForm({ ...startup });
+    setFormError('');
+    setIsStartupModalOpen(true);
   };
 
-  // Form Submit
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleAddContactClick = () => {
+    setEditingContact(null);
+    setContactForm({
+      ...initialContactFormState,
+      companyId: startups[0]?.id || '', // Default to first company if available
+      lastInteractionDate: new Date().toISOString().split('T')[0]
+    });
+    setFormError('');
+    setIsContactModalOpen(true);
+  };
+
+  const handleEditContactClick = (contact: Contact) => {
+    setEditingContact(contact);
+    setContactForm({ ...contact });
+    setFormError('');
+    setIsContactModalOpen(true);
+  };
+
+  // --- SUBMITS ---
+  const handleStartupSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
-    // Basic Validation
-    if (!formState.company.trim()) {
+    if (!startupForm.company.trim()) {
       setFormError('Company name is required.');
       return;
     }
-    if (!formState.sector.trim()) {
+    if (!startupForm.sector.trim()) {
       setFormError('Sector is required.');
       return;
     }
 
-    // Process and sanitize URL
-    let formattedUrl = formState.url.trim();
-    if (formattedUrl && !/^https?:\/\//i.test(formattedUrl)) {
-      formattedUrl = `https://${formattedUrl}`;
-    }
+    let url = startupForm.url.trim();
+    if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
 
-    // Process and sanitize Linkedin URL
-    let formattedLinkedin = formState.founderLinkedin.trim();
-    if (formattedLinkedin && !/^https?:\/\//i.test(formattedLinkedin)) {
-      formattedLinkedin = `https://${formattedLinkedin}`;
-    }
+    let linkedin = startupForm.founderLinkedin.trim();
+    if (linkedin && !/^https?:\/\//i.test(linkedin)) linkedin = `https://${linkedin}`;
+
+    const updatedData = { ...startupForm, url, founderLinkedin: linkedin };
 
     if (editingStartup) {
-      // Edit
-      setStartups(prev =>
-        prev.map(s =>
-          s.id === editingStartup.id
-            ? { 
-                ...s, 
-                ...formState, 
-                url: formattedUrl, 
-                founderLinkedin: formattedLinkedin 
-              }
-            : s
-        )
-      );
+      setStartups(prev => prev.map(s => s.id === editingStartup.id ? { ...s, ...updatedData } : s));
     } else {
-      // Add
-      const newStartup: Startup = {
-        id: Date.now().toString(),
-        ...formState,
-        url: formattedUrl,
-        founderLinkedin: formattedLinkedin
-      };
+      const newStartup: Startup = { id: Date.now().toString(), ...updatedData };
       setStartups(prev => [newStartup, ...prev]);
     }
-
-    setIsModalOpen(false);
+    setIsStartupModalOpen(false);
   };
 
-  // --- EXPORT / IMPORT ENGINE ---
-  // CSV Export
-  const handleExportCSV = () => {
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!contactForm.name.trim()) {
+      setFormError('Contact name is required.');
+      return;
+    }
+
+    let linkedin = contactForm.linkedin.trim();
+    if (linkedin && !/^https?:\/\//i.test(linkedin)) linkedin = `https://${linkedin}`;
+
+    const updatedData = { ...contactForm, linkedin };
+
+    if (editingContact) {
+      setContacts(prev => prev.map(c => c.id === editingContact.id ? { ...c, ...updatedData } : c));
+    } else {
+      const newContact: Contact = { id: `c_${Date.now()}`, ...updatedData };
+      setContacts(prev => [newContact, ...prev]);
+    }
+    setIsContactModalOpen(false);
+  };
+
+  // --- IMPORTS & EXPORTS ---
+  const handleExportStartupsCSV = () => {
     const headers = [
-      'Company', 'URL', 'One-line description', 'Sector', 'Investor', 
-      'Funding Stage', 'Amount', 'Team Size', 'Hiring?', 'Role Relevance', 
+      'Company', 'URL', 'Description', 'Sector', 'Investor', 
+      'Funding Stage', 'Amount', 'Team Size', 'Hiring?', 'Relevance', 
       'Founder LinkedIn', 'Outreach Status', 'Last Contact Date', 'Notes'
     ];
-
-    const escapeCSV = (str: string | number | boolean | undefined) => {
-      if (str === undefined || str === null) return '""';
-      const value = String(str);
-      const escaped = value.replace(/"/g, '""');
-      return `"${escaped}"`;
-    };
+    const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
 
     const csvRows = [
       headers.join(','),
@@ -283,507 +325,611 @@ function App() {
       ].join(','))
     ];
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `startup_intelligence_tracker_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `indisight_startups_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
   };
 
-  // JSON Export (Backup)
-  const handleExportJSON = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(startups, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `startup_intelligence_tracker_backup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    document.body.removeChild(downloadAnchor);
+  const handleExportContactsCSV = () => {
+    const headers = [
+      'Name', 'Title', 'Company', 'LinkedIn', 'Connection Status', 
+      'DM Status', 'Last Interaction Date', 'Notes'
+    ];
+    const escapeCSV = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+
+    const csvRows = [
+      headers.join(','),
+      ...contacts.map(c => {
+        const companyName = startups.find(s => s.id === c.companyId)?.company || 'Unlinked';
+        return [
+          escapeCSV(c.name),
+          escapeCSV(c.title),
+          escapeCSV(companyName),
+          escapeCSV(c.linkedin),
+          escapeCSV(c.connectionStatus),
+          escapeCSV(c.dmStatus),
+          escapeCSV(c.lastInteractionDate),
+          escapeCSV(c.notes)
+        ].join(',');
+      })
+    ];
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `indisight_contacts_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
-  // JSON Import
-  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileReader = new FileReader();
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Full Database JSON Backup Export
+  const handleExportFullJSON = () => {
+    const backupData = {
+      startups,
+      contacts
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `indisight_full_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  };
 
-    fileReader.onload = (event) => {
+  // Full Database JSON Restore Import
+  const handleImportFullJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (Array.isArray(parsed)) {
-          // Simple validation check on schema of the first element
-          const isValidSchema = parsed.length === 0 || (
-            'company' in parsed[0] && 
-            'sector' in parsed[0] && 
-            'relevance' in parsed[0] && 
-            'outreachStatus' in parsed[0]
-          );
+        if (parsed && typeof parsed === 'object') {
+          const hasStartups = Array.isArray(parsed.startups);
+          const hasContacts = Array.isArray(parsed.contacts);
 
-          if (isValidSchema) {
-            // Generate clean IDs if missing
-            const sanitized = parsed.map((item, idx) => ({
-              ...initialFormState,
-              ...item,
-              id: item.id || `${Date.now()}_${idx}`
-            }));
-            
-            if (window.confirm(`Found ${sanitized.length} startups. Overwrite existing tracking list?`)) {
-              setStartups(sanitized);
+          if (hasStartups || hasContacts) {
+            if (window.confirm('Restore dataset from this backup file? Existing data will be overwritten.')) {
+              if (hasStartups) setStartups(parsed.startups);
+              if (hasContacts) setContacts(parsed.contacts);
             }
           } else {
-            alert('Invalid JSON file format. Startup database schema mismatch.');
+            alert('Invalid backup schema. File must contain startups and/or contacts lists.');
           }
-        } else {
-          alert('Invalid JSON structure. Needs to be a list/array of startups.');
         }
       } catch (err) {
-        alert('Failed to parse file. Ensure it is a valid JSON database.');
+        alert('Failed to parse backup JSON. Ensure the file integrity is correct.');
         console.error(err);
       }
     };
-
-    fileReader.readAsText(files[0]);
-    // Reset file input value so same file can be selected again
+    reader.readAsText(file);
     e.target.value = '';
   };
 
-  // Trigger JSON Import click
-  const triggerImport = () => {
-    fileInputRef.current?.click();
-  };
+  // --- FILTERS & SORTS PIPELINE ---
+  // 1. Sector Lists
+  const uniqueSectors = Array.from(new Set(startups.map(s => s.sector.trim()).filter(Boolean))).sort();
 
-  // --- DATA FILTERING & SORTING PIPELINE ---
-  const filteredStartups = startups.filter(startup => {
-    const matchesSearch = 
-      startup.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      startup.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      startup.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      startup.sector.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      startup.investor.toLowerCase().includes(searchTerm.toLowerCase());
+  // 2. Startups Query logic
+  const filteredStartups = startups.filter(s => {
+    const matchSearch = 
+      s.company.toLowerCase().includes(startupSearch.toLowerCase()) ||
+      s.description.toLowerCase().includes(startupSearch.toLowerCase()) ||
+      s.notes.toLowerCase().includes(startupSearch.toLowerCase()) ||
+      s.sector.toLowerCase().includes(startupSearch.toLowerCase());
 
-    const matchesSector = !selectedSector || startup.sector.trim().toLowerCase() === selectedSector.trim().toLowerCase();
-    
-    const matchesHiring = selectedHiring === 'all' 
-      ? true 
-      : selectedHiring === 'hiring' 
-        ? startup.hiring 
-        : !startup.hiring;
+    const matchSector = !selectedSector || s.sector === selectedSector;
+    const matchHiring = selectedHiring === 'all' ? true : selectedHiring === 'hiring' ? s.hiring : !s.hiring;
+    const matchRelevance = selectedRelevance === 'all' ? true : s.relevance === selectedRelevance;
 
-    const matchesRelevance = selectedRelevance === 'all' 
-      ? true 
-      : startup.relevance === selectedRelevance;
-
-    return matchesSearch && matchesSector && matchesHiring && matchesRelevance;
+    return matchSearch && matchSector && matchHiring && matchRelevance;
   });
 
   const sortedStartups = [...filteredStartups].sort((a, b) => {
-    if (!sortField) return 0;
-    
-    let valA = a[sortField];
-    let valB = b[sortField];
+    if (!startupSortField) return 0;
+    const valA = a[startupSortField];
+    const valB = b[startupSortField];
 
-    // Boolean sort helper
     if (typeof valA === 'boolean' && typeof valB === 'boolean') {
-      return sortDirection === 'asc' 
-        ? (valA === valB ? 0 : valA ? -1 : 1)
-        : (valA === valB ? 0 : valA ? 1 : -1);
+      return startupSortDir === 'asc' ? (valA === valB ? 0 : valA ? -1 : 1) : (valA === valB ? 0 : valA ? 1 : -1);
     }
-
-    // Number sort helper
     if (typeof valA === 'number' && typeof valB === 'number') {
-      return sortDirection === 'asc' ? valA - valB : valB - valA;
+      return startupSortDir === 'asc' ? valA - valB : valB - valA;
     }
-
-    // String sort helper (case insensitive)
-    const strA = String(valA).toLowerCase();
-    const strB = String(valB).toLowerCase();
-
-    if (strA < strB) return sortDirection === 'asc' ? -1 : 1;
-    if (strA > strB) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
+    return startupSortDir === 'asc'
+      ? String(valA).localeCompare(String(valB))
+      : String(valB).localeCompare(String(valA));
   });
 
-  // --- STATS COMPUTATION ---
-  const totalCount = startups.length;
-  const highRelevanceCount = startups.filter(s => s.relevance === 'High').length;
-  const hiringCount = startups.filter(s => s.hiring).length;
-  const pipelineCount = startups.filter(
-    s => s.outreachStatus !== 'Not Started' && s.outreachStatus !== 'Closed'
-  ).length;
+  // 3. Contacts Query logic
+  const filteredContacts = contacts.filter(c => {
+    const company = startups.find(s => s.id === c.companyId);
+    const companyName = company?.company || '';
+    
+    const matchSearch = 
+      c.name.toLowerCase().includes(contactSearch.toLowerCase()) ||
+      c.title.toLowerCase().includes(contactSearch.toLowerCase()) ||
+      c.notes.toLowerCase().includes(contactSearch.toLowerCase()) ||
+      companyName.toLowerCase().includes(contactSearch.toLowerCase());
+
+    const matchCompany = !selectedContactCompany || c.companyId === selectedContactCompany;
+    const matchConn = selectedConnectionStatus === 'all' ? true : c.connectionStatus === selectedConnectionStatus;
+    const matchDM = selectedDMStatus === 'all' ? true : c.dmStatus === selectedDMStatus;
+
+    return matchSearch && matchCompany && matchConn && matchDM;
+  });
+
+  const sortedContacts = [...filteredContacts].sort((a, b) => {
+    if (!contactSortField) return 0;
+    const valA = a[contactSortField];
+    const valB = b[contactSortField];
+
+    return contactSortDir === 'asc'
+      ? String(valA).localeCompare(String(valB))
+      : String(valB).localeCompare(String(valA));
+  });
+
+  // --- STATS PANELS ---
+  // Startup KPI
+  const statsStartups = {
+    total: startups.length,
+    high: startups.filter(s => s.relevance === 'High').length,
+    hiring: startups.filter(s => s.hiring).length,
+    outreach: startups.filter(s => s.outreachStatus !== 'Not Started' && s.outreachStatus !== 'Closed').length
+  };
+
+  // Contacts KPI
+  const statsContacts = {
+    total: contacts.length,
+    connected: contacts.filter(c => c.connectionStatus === 'Connected').length,
+    replied: contacts.filter(c => c.dmStatus === 'Replied').length,
+    followup: contacts.filter(c => c.dmStatus === 'Pitch Sent' || c.dmStatus === 'Followed Up').length
+  };
 
   return (
     <div className="app-container">
-      {/* HEADER SECTION */}
+      {/* HEADER BAR */}
       <header>
         <div className="brand-section">
           <h1>
-            <FileSpreadsheet size={32} style={{ color: 'var(--primary)' }} />
+            <FileSpreadsheet size={32} />
             INDISIGHT
           </h1>
-          <p>Indian early-stage startup intelligence tracker for DevOps/MLOps hiring</p>
+          <p>DevOps/MLOps Hiring Intelligence & Outreach Planner</p>
         </div>
-        <button 
-          onClick={toggleTheme} 
-          className="theme-toggle-btn"
-          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
-          aria-label="Toggle Theme"
-        >
-          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-        </button>
+
+        <div className="header-controls">
+          {/* TAB BUTTONS */}
+          <div className="nav-tabs">
+            <button 
+              className={`nav-tab-btn ${activeTab === 'startups' ? 'active' : ''}`}
+              onClick={() => setActiveTab('startups')}
+            >
+              <Building2 size={16} /> Startups
+            </button>
+            <button 
+              className={`nav-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('contacts')}
+            >
+              <Users size={16} /> Contacts & Outreach
+            </button>
+          </div>
+
+          <button 
+            onClick={toggleTheme} 
+            className="theme-toggle-btn"
+            title="Toggle theme"
+            aria-label="Toggle theme color"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
       </header>
 
-      {/* KPI STATS CARDS */}
-      <section className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">
-            <Building2 size={24} />
+      {/* DYNAMIC METRICS DASHBOARD */}
+      {activeTab === 'startups' ? (
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon"><Building2 size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Total Startups</span>
+              <span className="stat-value">{statsStartups.total}</span>
+            </div>
           </div>
-          <div className="stat-info">
-            <span className="stat-label">Total Startups</span>
-            <span className="stat-value">{totalCount}</span>
+          <div className="stat-card relevance-high">
+            <div className="stat-icon"><TrendingUp size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">High Relevance</span>
+              <span className="stat-value">{statsStartups.high}</span>
+            </div>
           </div>
-        </div>
+          <div className="stat-card hiring">
+            <div className="stat-icon"><Users size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Actively Hiring</span>
+              <span className="stat-value">{statsStartups.hiring}</span>
+            </div>
+          </div>
+          <div className="stat-card pipeline">
+            <div className="stat-icon"><CheckCircle2 size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Active Pipelines</span>
+              <span className="stat-value">{statsStartups.outreach}</span>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon"><Users size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Total Contacts</span>
+              <span className="stat-value">{statsContacts.total}</span>
+            </div>
+          </div>
+          <div className="stat-card relevance-high">
+            <div className="stat-icon"><UserCheck size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Connections</span>
+              <span className="stat-value">{statsContacts.connected}</span>
+            </div>
+          </div>
+          <div className="stat-card pipeline">
+            <div className="stat-icon"><MessageSquare size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Replies Received</span>
+              <span className="stat-value">{statsContacts.replied}</span>
+            </div>
+          </div>
+          <div className="stat-card hiring">
+            <div className="stat-icon"><Network size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Follow-ups Active</span>
+              <span className="stat-value">{statsContacts.followup}</span>
+            </div>
+          </div>
+        </section>
+      )}
 
-        <div className="stat-card relevance-high">
-          <div className="stat-icon">
-            <TrendingUp size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">High Relevance</span>
-            <span className="stat-value">{highRelevanceCount}</span>
-          </div>
-        </div>
-
-        <div className="stat-card hiring">
-          <div className="stat-icon">
-            <Users size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Hiring Active</span>
-            <span className="stat-value">{hiringCount}</span>
-          </div>
-        </div>
-
-        <div className="stat-card pipeline">
-          <div className="stat-icon">
-            <CheckCircle2 size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Active Outreach</span>
-            <span className="stat-value">{pipelineCount}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* SEARCH AND FILTERS CONTROLS */}
+      {/* FILTER & GLOBAL ACTIONS BAR */}
       <section className="controls-container">
-        <div className="filters-group">
-          {/* SEARCH BAR */}
-          <div className="search-wrapper">
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search startup, description, investor, notes..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
+        {activeTab === 'startups' ? (
+          <div className="filters-group">
+            <div className="search-wrapper">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search startups..."
+                value={startupSearch}
+                onChange={e => setStartupSearch(e.target.value)}
+                className="search-input"
+              />
+            </div>
+            
+            <select
+              value={selectedSector}
+              onChange={e => setSelectedSector(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Sectors</option>
+              {uniqueSectors.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            <select
+              value={selectedHiring}
+              onChange={e => setSelectedHiring(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="all">All Hiring Status</option>
+              <option value="hiring">Hiring (Yes)</option>
+              <option value="not_hiring">Not Hiring (No)</option>
+            </select>
+
+            <select
+              value={selectedRelevance}
+              onChange={e => setSelectedRelevance(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="all">All Relevance</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
           </div>
+        ) : (
+          <div className="filters-group">
+            <div className="search-wrapper">
+              <Search size={18} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search contacts..."
+                value={contactSearch}
+                onChange={e => setContactSearch(e.target.value)}
+                className="search-input"
+              />
+            </div>
 
-          {/* SECTOR FILTER */}
-          <select
-            value={selectedSector}
-            onChange={e => setSelectedSector(e.target.value)}
-            className="filter-select"
-            aria-label="Filter by Sector"
-          >
-            <option value="">All Sectors</option>
-            {uniqueSectors.map(sector => (
-              <option key={sector} value={sector}>{sector}</option>
-            ))}
-          </select>
+            <select
+              value={selectedContactCompany}
+              onChange={e => setSelectedContactCompany(e.target.value)}
+              className="filter-select"
+            >
+              <option value="">All Companies</option>
+              {startups.map(s => <option key={s.id} value={s.id}>{s.company}</option>)}
+            </select>
 
-          {/* HIRING FILTER */}
-          <select
-            value={selectedHiring}
-            onChange={e => setSelectedHiring(e.target.value as any)}
-            className="filter-select"
-            aria-label="Filter by Hiring Status"
-          >
-            <option value="all">All Hiring Status</option>
-            <option value="hiring">Hiring (Yes)</option>
-            <option value="not_hiring">Not Hiring (No)</option>
-          </select>
+            <select
+              value={selectedConnectionStatus}
+              onChange={e => setSelectedConnectionStatus(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="all">All Connection States</option>
+              <option value="Not Connected">Not Connected</option>
+              <option value="Request Sent">Request Sent</option>
+              <option value="Connected">Connected</option>
+            </select>
 
-          {/* RELEVANCE FILTER */}
-          <select
-            value={selectedRelevance}
-            onChange={e => setSelectedRelevance(e.target.value as any)}
-            className="filter-select"
-            aria-label="Filter by Role Relevance"
-          >
-            <option value="all">All Relevance</option>
-            <option value="High">High Relevance</option>
-            <option value="Medium">Medium Relevance</option>
-            <option value="Low">Low Relevance</option>
-          </select>
-        </div>
+            <select
+              value={selectedDMStatus}
+              onChange={e => setSelectedDMStatus(e.target.value as any)}
+              className="filter-select"
+            >
+              <option value="all">All DM Statuses</option>
+              <option value="Not Messaged">Not Messaged</option>
+              <option value="Pitch Sent">Pitch Sent</option>
+              <option value="Replied">Replied</option>
+              <option value="Followed Up">Followed Up</option>
+            </select>
+          </div>
+        )}
 
-        {/* UTILITY ACTION BUTTONS */}
         <div className="actions-group">
-          <button className="btn btn-primary" onClick={handleAddClick}>
-            <Plus size={16} /> Add Startup
-          </button>
-          
-          <button className="btn btn-secondary" onClick={handleExportCSV} title="Export current sheet to CSV">
-            <Download size={16} /> Export CSV
-          </button>
+          {activeTab === 'startups' ? (
+            <>
+              <button className="btn btn-primary" onClick={handleAddStartupClick}>
+                <Plus size={16} /> Add Startup
+              </button>
+              <button className="btn btn-secondary" onClick={handleExportStartupsCSV}>
+                <Download size={16} /> Export Startups CSV
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-primary" onClick={handleAddContactClick}>
+                <Plus size={16} /> Add Contact
+              </button>
+              <button className="btn btn-secondary" onClick={handleExportContactsCSV}>
+                <Download size={16} /> Export Contacts CSV
+              </button>
+            </>
+          )}
 
-          <button className="btn btn-secondary" onClick={handleExportJSON} title="Backup database as JSON file">
+          <button className="btn btn-secondary" onClick={handleExportFullJSON} title="Backup entire database to JSON">
             Backup JSON
           </button>
-
-          <button className="btn btn-secondary" onClick={triggerImport} title="Restore database from backup JSON file">
-            <Upload size={16} /> Import JSON
+          
+          <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} title="Restore database from JSON">
+            <Upload size={16} /> Restore JSON
           </button>
           
           <input 
             type="file" 
             ref={fileInputRef} 
-            onChange={handleImportJSON} 
+            onChange={handleImportFullJSON} 
             accept=".json" 
-            className="hidden-file-input" 
+            style={{ display: 'none' }} 
           />
         </div>
       </section>
 
-      {/* SPREADSHEET DATAGRID */}
+      {/* SHEET DATAGRID TABLE */}
       <section className="table-card">
         <div className="table-wrapper">
-          {sortedStartups.length > 0 ? (
-            <table className="startup-table">
-              <thead>
-                <tr>
-                  <th onClick={() => handleSort('company')}>
-                    <div className="header-content">Company {renderSortIcon('company')}</div>
-                  </th>
-                  <th>URL</th>
-                  <th>One-line description</th>
-                  <th onClick={() => handleSort('sector')}>
-                    <div className="header-content">Sector {renderSortIcon('sector')}</div>
-                  </th>
-                  <th>Investor</th>
-                  <th onClick={() => handleSort('fundingStage')}>
-                    <div className="header-content">Stage {renderSortIcon('fundingStage')}</div>
-                  </th>
-                  <th onClick={() => handleSort('amount')}>
-                    <div className="header-content">Amount {renderSortIcon('amount')}</div>
-                  </th>
-                  <th onClick={() => handleSort('teamSize')}>
-                    <div className="header-content">Team {renderSortIcon('teamSize')}</div>
-                  </th>
-                  <th onClick={() => handleSort('hiring')}>
-                    <div className="header-content">Hiring? {renderSortIcon('hiring')}</div>
-                  </th>
-                  <th onClick={() => handleSort('relevance')}>
-                    <div className="header-content">Relevance {renderSortIcon('relevance')}</div>
-                  </th>
-                  <th>Founder LinkedIn</th>
-                  <th onClick={() => handleSort('outreachStatus')}>
-                    <div className="header-content">Outreach {renderSortIcon('outreachStatus')}</div>
-                  </th>
-                  <th onClick={() => handleSort('lastContactDate')}>
-                    <div className="header-content">Last Contact {renderSortIcon('lastContactDate')}</div>
-                  </th>
-                  <th>Notes</th>
-                  <th style={{ cursor: 'default' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedStartups.map(startup => {
-                  const relevanceClass = `relevance-${startup.relevance.toLowerCase()}`;
-                  const outreachClass = `status-${startup.outreachStatus.toLowerCase().replace(' ', '-')}`;
-                  
-                  return (
-                    <tr 
-                      key={startup.id} 
-                      className={`startup-row ${relevanceClass}`}
-                    >
-                      {/* Company Name */}
-                      <td style={{ fontWeight: 600 }}>{startup.company}</td>
-                      
-                      {/* Web URL */}
+          {activeTab === 'startups' ? (
+            sortedStartups.length > 0 ? (
+              <table className="startup-table">
+                <thead>
+                  <tr>
+                    <th onClick={() => handleStartupSort('company')}>
+                      <div className="header-content">Company {renderSortIcon(startupSortField, 'company', startupSortDir)}</div>
+                    </th>
+                    <th>URL</th>
+                    <th>One-line description</th>
+                    <th onClick={() => handleStartupSort('sector')}>
+                      <div className="header-content">Sector {renderSortIcon(startupSortField, 'sector', startupSortDir)}</div>
+                    </th>
+                    <th>Investor</th>
+                    <th onClick={() => handleStartupSort('fundingStage')}>
+                      <div className="header-content">Stage {renderSortIcon(startupSortField, 'fundingStage', startupSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleStartupSort('amount')}>
+                      <div className="header-content">Amount {renderSortIcon(startupSortField, 'amount', startupSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleStartupSort('teamSize')}>
+                      <div className="header-content">Team {renderSortIcon(startupSortField, 'teamSize', startupSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleStartupSort('hiring')}>
+                      <div className="header-content">Hiring? {renderSortIcon(startupSortField, 'hiring', startupSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleStartupSort('relevance')}>
+                      <div className="header-content">Relevance {renderSortIcon(startupSortField, 'relevance', startupSortDir)}</div>
+                    </th>
+                    <th>Founder LinkedIn</th>
+                    <th onClick={() => handleStartupSort('outreachStatus')}>
+                      <div className="header-content">Outreach {renderSortIcon(startupSortField, 'outreachStatus', startupSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleStartupSort('lastContactDate')}>
+                      <div className="header-content">Last Contact {renderSortIcon(startupSortField, 'lastContactDate', startupSortDir)}</div>
+                    </th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedStartups.map(s => (
+                    <tr key={s.id} className={`startup-row relevance-${s.relevance.toLowerCase()}`}>
+                      <td style={{ fontWeight: 600 }}>{s.company}</td>
                       <td>
-                        {startup.url ? (
-                          <a 
-                            href={startup.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="cell-link"
-                            title={startup.url}
-                          >
+                        {s.url ? (
+                          <a href={s.url} target="_blank" rel="noreferrer" className="cell-link">
                             Visit <ExternalLink size={12} style={{ display: 'inline', marginLeft: '2px' }} />
                           </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>None</span>
-                        )}
+                        ) : '-'}
                       </td>
-                      
-                      {/* Description */}
-                      <td className="text-truncate" title={startup.description}>
-                        {startup.description || '-'}
-                      </td>
-                      
-                      {/* Sector */}
+                      <td className="text-truncate" title={s.description}>{s.description || '-'}</td>
+                      <td><span className="badge badge-relevance-low">{s.sector}</span></td>
+                      <td className="text-truncate" title={s.investor}>{s.investor || '-'}</td>
+                      <td>{s.fundingStage || '-'}</td>
+                      <td>{s.amount || '-'}</td>
+                      <td>{s.teamSize || '-'}</td>
                       <td>
-                        <span className="badge badge-relevance-low">{startup.sector}</span>
-                      </td>
-                      
-                      {/* Investor */}
-                      <td className="text-truncate" title={startup.investor}>
-                        {startup.investor || '-'}
-                      </td>
-                      
-                      {/* Funding Stage */}
-                      <td>{startup.fundingStage || '-'}</td>
-                      
-                      {/* Funding Amount */}
-                      <td>{startup.amount || '-'}</td>
-                      
-                      {/* Team Size */}
-                      <td>{startup.teamSize || '-'}</td>
-                      
-                      {/* Hiring Toggle */}
-                      <td>
-                        <span className={`badge ${startup.hiring ? 'badge-hiring' : 'badge-not-hiring'}`}>
-                          {startup.hiring ? 'Yes' : 'No'}
+                        <span className={`badge ${s.hiring ? 'badge-hiring' : 'badge-not-hiring'}`}>
+                          {s.hiring ? 'Yes' : 'No'}
                         </span>
                       </td>
-                      
-                      {/* Role Relevance */}
                       <td>
-                        <span className={`badge badge-relevance-${startup.relevance.toLowerCase()}`}>
-                          {startup.relevance}
+                        <span className={`badge badge-relevance-${s.relevance.toLowerCase()}`}>
+                          {s.relevance}
                         </span>
                       </td>
-                      
-                      {/* Founder LinkedIn Link */}
                       <td style={{ textAlign: 'center' }}>
-                        {startup.founderLinkedin ? (
-                          <a 
-                            href={startup.founderLinkedin} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="linkedin-btn"
-                            title="LinkedIn Profile"
-                            aria-label="Founder LinkedIn Profile"
-                          >
+                        {s.founderLinkedin ? (
+                          <a href={s.founderLinkedin} target="_blank" rel="noreferrer" className="linkedin-btn">
                             <LinkedInIcon size={18} />
                           </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>-</span>
-                        )}
+                        ) : '-'}
                       </td>
-                      
-                      {/* Outreach Status */}
                       <td>
-                        <span className={`status-badge ${outreachClass}`}>
-                          {startup.outreachStatus}
+                        <span className={`status-badge status-${s.outreachStatus.toLowerCase().replace(' ', '-')}`}>
+                          {s.outreachStatus}
                         </span>
                       </td>
-                      
-                      {/* Last Contact Date */}
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        {startup.lastContactDate || '-'}
-                      </td>
-                      
-                      {/* Notes Column */}
-                      <td className="text-truncate notes-cell" title={startup.notes}>
-                        {startup.notes || '-'}
-                      </td>
-                      
-                      {/* Row Actions */}
+                      <td>{s.lastContactDate || '-'}</td>
+                      <td className="text-truncate notes-cell" title={s.notes}>{s.notes || '-'}</td>
                       <td>
                         <div className="row-actions">
-                          <button 
-                            onClick={() => handleEditClick(startup)} 
-                            className="action-icon-btn"
-                            title="Edit Startup"
-                            aria-label="Edit Startup"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(startup.id, startup.company)} 
-                            className="action-icon-btn delete-btn"
-                            title="Delete Startup"
-                            aria-label="Delete Startup"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <button onClick={() => handleEditStartupClick(s)} className="action-icon-btn"><Edit2 size={14} /></button>
+                          <button onClick={() => handleDeleteStartup(s.id, s.company)} className="action-icon-btn delete-btn"><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="empty-state">
+                <Search size={48} className="empty-state-icon" />
+                <h3>No startups found</h3>
+              </div>
+            )
           ) : (
-            <div className="empty-state">
-              <Search size={48} className="empty-state-icon" />
-              <h3>No startups found</h3>
-              <p>Try adjusting your search criteria, removing filters, or add a new startup record.</p>
-              {searchTerm || selectedSector || selectedHiring !== 'all' || selectedRelevance !== 'all' ? (
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedSector('');
-                    setSelectedHiring('all');
-                    setSelectedRelevance('all');
-                  }}
-                >
-                  Clear Filters
-                </button>
-              ) : null}
-            </div>
+            // Contacts Log View Table
+            sortedContacts.length > 0 ? (
+              <table className="startup-table">
+                <thead>
+                  <tr>
+                    <th onClick={() => handleContactSort('name')}>
+                      <div className="header-content">Name {renderSortIcon(contactSortField, 'name', contactSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleContactSort('title')}>
+                      <div className="header-content">Title {renderSortIcon(contactSortField, 'title', contactSortDir)}</div>
+                    </th>
+                    <th>Company</th>
+                    <th>LinkedIn</th>
+                    <th onClick={() => handleContactSort('connectionStatus')}>
+                      <div className="header-content">Connection {renderSortIcon(contactSortField, 'connectionStatus', contactSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleContactSort('dmStatus')}>
+                      <div className="header-content">DM Status {renderSortIcon(contactSortField, 'dmStatus', contactSortDir)}</div>
+                    </th>
+                    <th onClick={() => handleContactSort('lastInteractionDate')}>
+                      <div className="header-content">Last Contact {renderSortIcon(contactSortField, 'lastInteractionDate', contactSortDir)}</div>
+                    </th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedContacts.map(c => {
+                    const company = startups.find(s => s.id === c.companyId);
+                    
+                    return (
+                      <tr key={c.id} className="startup-row">
+                        <td style={{ fontWeight: 600 }}>{c.name}</td>
+                        <td>{c.title || '-'}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          {company ? (
+                            <span className="badge badge-relevance-low">{company.company}</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Unlinked</span>
+                          )}
+                        </td>
+                        <td>
+                          {c.linkedin ? (
+                            <a href={c.linkedin} target="_blank" rel="noreferrer" className="linkedin-btn">
+                              <LinkedInIcon size={18} />
+                            </a>
+                          ) : '-'}
+                        </td>
+                        <td>
+                          <span className={`status-badge conn-${c.connectionStatus.toLowerCase().replace(' ', '-')}`}>
+                            {c.connectionStatus}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge dm-${c.dmStatus.toLowerCase().replace(' ', '-')}`}>
+                            {c.dmStatus}
+                          </span>
+                        </td>
+                        <td>{c.lastInteractionDate}</td>
+                        <td className="text-truncate notes-cell" title={c.notes}>{c.notes || '-'}</td>
+                        <td>
+                          <div className="row-actions">
+                            <button onClick={() => handleEditContactClick(c)} className="action-icon-btn"><Edit2 size={14} /></button>
+                            <button onClick={() => handleDeleteContact(c.id, c.name)} className="action-icon-btn delete-btn"><Trash2 size={14} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="empty-state">
+                <Search size={48} className="empty-state-icon" />
+                <h3>No contacts found</h3>
+              </div>
+            )
           )}
         </div>
       </section>
 
-      {/* ADD / EDIT DIALOG FORM */}
-      {isModalOpen && (
+      {/* STARTUP MODAL FORM */}
+      {isStartupModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h2>{editingStartup ? `Edit ${formState.company || 'Startup'}` : 'Add New Startup'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="close-modal-btn" aria-label="Close dialog">
-                <X size={20} />
-              </button>
+              <h2>{editingStartup ? `Edit ${startupForm.company}` : 'Add New Startup'}</h2>
+              <button onClick={() => setIsStartupModalOpen(false)} className="close-modal-btn"><X size={20} /></button>
             </div>
             
-            <form onSubmit={handleFormSubmit} className="modal-form">
+            <form onSubmit={handleStartupSubmit} className="modal-form">
               {formError && (
-                <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>
                   <AlertCircle size={16} />
                   <span>{formError}</span>
                 </div>
               )}
-
-              {/* Company & URL */}
+              
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Company Name *</label>
                   <input
                     type="text"
-                    name="company"
-                    value={formState.company}
-                    onChange={handleFormChange}
                     required
-                    placeholder="e.g. Keploy"
+                    value={startupForm.company}
+                    onChange={e => setStartupForm({ ...startupForm, company: e.target.value })}
                     className="form-input"
                   />
                 </div>
@@ -791,115 +937,94 @@ function App() {
                   <label className="form-label">Website URL</label>
                   <input
                     type="text"
-                    name="url"
-                    value={formState.url}
-                    onChange={handleFormChange}
-                    placeholder="e.g. https://keploy.io"
+                    value={startupForm.url}
+                    onChange={e => setStartupForm({ ...startupForm, url: e.target.value })}
+                    placeholder="https://example.com"
                     className="form-input"
                   />
                 </div>
               </div>
 
-              {/* Description */}
               <div className="form-group form-group-full">
-                <label className="form-label">One-line description</label>
+                <label className="form-label">Description</label>
                 <input
                   type="text"
-                  name="description"
-                  value={formState.description}
-                  onChange={handleFormChange}
-                  placeholder="e.g. API testing platform that generates mock test data"
+                  value={startupForm.description}
+                  onChange={e => setStartupForm({ ...startupForm, description: e.target.value })}
                   className="form-input"
                 />
               </div>
 
-              {/* Sector & Investor */}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Sector *</label>
                   <input
                     type="text"
-                    name="sector"
-                    value={formState.sector}
-                    onChange={handleFormChange}
                     required
-                    placeholder="e.g. DevOps / Testing"
+                    value={startupForm.sector}
+                    onChange={e => setStartupForm({ ...startupForm, sector: e.target.value })}
                     className="form-input"
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Investor(s)</label>
+                  <label className="form-label">Investor</label>
                   <input
                     type="text"
-                    name="investor"
-                    value={formState.investor}
-                    onChange={handleFormChange}
-                    placeholder="e.g. Sequoia Spark, Boldcap"
+                    value={startupForm.investor}
+                    onChange={e => setStartupForm({ ...startupForm, investor: e.target.value })}
                     className="form-input"
                   />
                 </div>
               </div>
 
-              {/* Funding Stage & Amount */}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Funding Stage</label>
                   <input
                     type="text"
-                    name="fundingStage"
-                    value={formState.fundingStage}
-                    onChange={handleFormChange}
-                    placeholder="e.g. Seed, Pre-Seed, Series A"
+                    value={startupForm.fundingStage}
+                    onChange={e => setStartupForm({ ...startupForm, fundingStage: e.target.value })}
                     className="form-input"
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Funding Amount</label>
+                  <label className="form-label">Amount</label>
                   <input
                     type="text"
-                    name="amount"
-                    value={formState.amount}
-                    onChange={handleFormChange}
-                    placeholder="e.g. $3.2M, N/A"
+                    value={startupForm.amount}
+                    onChange={e => setStartupForm({ ...startupForm, amount: e.target.value })}
                     className="form-input"
                   />
                 </div>
               </div>
 
-              {/* Team Size & Founder Linkedin */}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Team Size</label>
                   <input
                     type="number"
-                    name="teamSize"
-                    value={formState.teamSize}
-                    onChange={handleFormChange}
-                    min="1"
+                    value={startupForm.teamSize}
+                    onChange={e => setStartupForm({ ...startupForm, teamSize: parseInt(e.target.value) || 0 })}
                     className="form-input"
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Founder LinkedIn URL</label>
+                  <label className="form-label">Founder LinkedIn</label>
                   <input
                     type="text"
-                    name="founderLinkedin"
-                    value={formState.founderLinkedin}
-                    onChange={handleFormChange}
-                    placeholder="e.g. https://linkedin.com/in/username"
+                    value={startupForm.founderLinkedin}
+                    onChange={e => setStartupForm({ ...startupForm, founderLinkedin: e.target.value })}
                     className="form-input"
                   />
                 </div>
               </div>
 
-              {/* Relevance & Outreach Status */}
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Role Relevance</label>
+                  <label className="form-label">Relevance</label>
                   <select
-                    name="relevance"
-                    value={formState.relevance}
-                    onChange={handleFormChange}
+                    value={startupForm.relevance}
+                    onChange={e => setStartupForm({ ...startupForm, relevance: e.target.value as any })}
                     className="form-select"
                   >
                     <option value="High">High</option>
@@ -907,13 +1032,11 @@ function App() {
                     <option value="Low">Low</option>
                   </select>
                 </div>
-                
                 <div className="form-group">
                   <label className="form-label">Outreach Status</label>
                   <select
-                    name="outreachStatus"
-                    value={formState.outreachStatus}
-                    onChange={handleFormChange}
+                    value={startupForm.outreachStatus}
+                    onChange={e => setStartupForm({ ...startupForm, outreachStatus: e.target.value as any })}
                     className="form-select"
                   >
                     <option value="Not Started">Not Started</option>
@@ -925,56 +1048,168 @@ function App() {
                 </div>
               </div>
 
-              {/* Last Contact Date & Hiring Toggle */}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Last Contact Date</label>
                   <input
                     type="date"
-                    name="lastContactDate"
-                    value={formState.lastContactDate}
-                    onChange={handleFormChange}
+                    value={startupForm.lastContactDate}
+                    onChange={e => setStartupForm({ ...startupForm, lastContactDate: e.target.value })}
                     className="form-input"
                   />
                 </div>
-                
                 <div className="form-group">
                   <label className="checkbox-container">
                     <input
                       type="checkbox"
-                      name="hiring"
-                      checked={formState.hiring}
-                      onChange={handleFormChange}
+                      checked={startupForm.hiring}
+                      onChange={e => setStartupForm({ ...startupForm, hiring: e.target.checked })}
                     />
                     <div className="checkbox-custom">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     </div>
-                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Actively Hiring DevOps/MLOps?</span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Actively Hiring?</span>
                   </label>
                 </div>
               </div>
 
-              {/* Notes */}
               <div className="form-group form-group-full">
-                <label className="form-label">Outreach Notes / Context</label>
+                <label className="form-label">Notes</label>
                 <textarea
-                  name="notes"
-                  value={formState.notes}
-                  onChange={handleFormChange}
-                  placeholder="Key details like conversation snippets, tech stack (Kubernetes, AWS, Terraform, Docker), referral routes, hiring feedback..."
+                  value={startupForm.notes}
+                  onChange={e => setStartupForm({ ...startupForm, notes: e.target.value })}
                   className="form-textarea"
                 />
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingStartup ? 'Save Changes' : 'Add Startup'}
-                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsStartupModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONTACT MODAL FORM */}
+      {isContactModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>{editingContact ? `Edit ${contactForm.name}` : 'Add Outreach Contact'}</h2>
+              <button onClick={() => setIsContactModalOpen(false)} className="close-modal-btn"><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleContactSubmit} className="modal-form">
+              {formError && (
+                <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                  <AlertCircle size={16} />
+                  <span>{formError}</span>
+                </div>
+              )}
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={contactForm.name}
+                    onChange={e => setContactForm({ ...contactForm, name: e.target.value })}
+                    placeholder="e.g. Prashant Ghildiyal"
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Title / Role</label>
+                  <input
+                    type="text"
+                    value={contactForm.title}
+                    onChange={e => setContactForm({ ...contactForm, title: e.target.value })}
+                    placeholder="e.g. Co-Founder & CTO"
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Link to Company</label>
+                  <select
+                    value={contactForm.companyId}
+                    onChange={e => setContactForm({ ...contactForm, companyId: e.target.value })}
+                    className="form-select"
+                  >
+                    <option value="">Select a company...</option>
+                    {startups.map(s => <option key={s.id} value={s.id}>{s.company}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">LinkedIn URL</label>
+                  <input
+                    type="text"
+                    value={contactForm.linkedin}
+                    onChange={e => setContactForm({ ...contactForm, linkedin: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Connection Status</label>
+                  <select
+                    value={contactForm.connectionStatus}
+                    onChange={e => setContactForm({ ...contactForm, connectionStatus: e.target.value as any })}
+                    className="form-select"
+                  >
+                    <option value="Not Connected">Not Connected</option>
+                    <option value="Request Sent">Request Sent</option>
+                    <option value="Connected">Connected</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">DM Status</label>
+                  <select
+                    value={contactForm.dmStatus}
+                    onChange={e => setContactForm({ ...contactForm, dmStatus: e.target.value as any })}
+                    className="form-select"
+                  >
+                    <option value="Not Messaged">Not Messaged</option>
+                    <option value="Pitch Sent">Pitch Sent</option>
+                    <option value="Replied">Replied</option>
+                    <option value="Followed Up">Followed Up</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Last Interaction Date</label>
+                  <input
+                    type="date"
+                    value={contactForm.lastInteractionDate}
+                    onChange={e => setContactForm({ ...contactForm, lastInteractionDate: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group form-group-full">
+                <label className="form-label">Outreach Notes / Chat Snippets</label>
+                <textarea
+                  value={contactForm.notes}
+                  onChange={e => setContactForm({ ...contactForm, notes: e.target.value })}
+                  placeholder="Paste details of messages exchanged, connection updates, referral details..."
+                  className="form-textarea"
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setIsContactModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save</button>
               </div>
             </form>
           </div>

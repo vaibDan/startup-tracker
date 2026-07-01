@@ -1,4 +1,4 @@
-import type { Startup } from './types';
+import type { Startup, Contact } from './types';
 
 export const seedStartups: Startup[] = [
   {
@@ -119,5 +119,63 @@ export const seedStartups: Startup[] = [
     outreachStatus: 'Not Started',
     lastContactDate: '2026-06-01',
     notes: 'Good fallback for junior/mid DevOps roles. Large talent pool of Kubernetes certified specialists.'
+  }
+];
+
+export const seedContacts: Contact[] = [
+  {
+    id: 'c1',
+    name: 'Prashant Ghildiyal',
+    title: 'Co-Founder & CEO',
+    companyId: '1', // Devtron
+    linkedin: 'https://www.linkedin.com/in/prashantghildiyal/',
+    connectionStatus: 'Connected',
+    dmStatus: 'Not Messaged',
+    lastInteractionDate: '2026-06-15',
+    notes: 'Accepted my connection request. Planning to send him our candidate profile next week.'
+  },
+  {
+    id: 'c2',
+    name: 'Neharika',
+    title: 'Co-Founder',
+    companyId: '2', // Keploy
+    linkedin: 'https://www.linkedin.com/in/neharika-keploy/',
+    connectionStatus: 'Connected',
+    dmStatus: 'Pitch Sent',
+    lastInteractionDate: '2026-06-20',
+    notes: 'Pitch sent regarding senior developer testing hires. No response yet.'
+  },
+  {
+    id: 'c3',
+    name: 'Siddharth Singh',
+    title: 'Co-Founder',
+    companyId: '3', // Doctor Droid
+    linkedin: 'https://www.linkedin.com/in/siddharth-singgh/',
+    connectionStatus: 'Connected',
+    dmStatus: 'Replied',
+    lastInteractionDate: '2026-06-26',
+    notes: 'Exchanged messages. Mentioned they need a DevOps lead with strong Prometheus setup expertise.'
+  },
+  {
+    id: 'c4',
+    name: 'Nikunj Bajaj',
+    title: 'Co-Founder',
+    companyId: '4', // TrueFoundry
+    linkedin: 'https://www.linkedin.com/in/nikunj-bajaj/',
+    connectionStatus: 'Connected',
+    dmStatus: 'Followed Up',
+    lastInteractionDate: '2026-06-28',
+    notes: 'Spoke briefly about candidates for MLOps engineer positions. Followed up with resumes.'
+  },
+  {
+    id: 'c5',
+    name: 'Vishal Biyani',
+    title: 'Founder & CTO',
+    companyId: '7', // InfraCloud
+    linkedin: 'https://www.linkedin.com/in/vishal-biyani/',
+    connectionStatus: 'Request Sent',
+    dmStatus: 'Not Messaged',
+    lastInteractionDate: '2026-06-01',
+    notes: 'Sent connection request on LinkedIn.'
   }
 ];

@@ -208,6 +208,46 @@ header {
   margin-top: 0.25rem;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.nav-tabs {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-main);
+}
+
+.nav-tab-btn.active {
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+
 .theme-toggle-btn {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -626,6 +666,50 @@ header {
   color: var(--status-closed-text);
 }
 .status-badge.status-closed::before { background-color: var(--status-closed-text); }
+
+/* Connection Status Badge Styling */
+.status-badge.conn-not-connected {
+  background: var(--status-not-started-bg);
+  color: var(--status-not-started-text);
+}
+.status-badge.conn-not-connected::before { background-color: var(--status-not-started-text); }
+
+.status-badge.conn-request-sent {
+  background: var(--status-messaged-bg);
+  color: var(--status-messaged-text);
+}
+.status-badge.conn-request-sent::before { background-color: var(--status-messaged-text); }
+
+.status-badge.conn-connected {
+  background: var(--relevance-high-bg);
+  color: var(--relevance-high-text);
+}
+.status-badge.conn-connected::before { background-color: var(--relevance-high-text); }
+
+/* DM Status Badge Styling */
+.status-badge.dm-not-messaged {
+  background: var(--status-not-started-bg);
+  color: var(--status-not-started-text);
+}
+.status-badge.dm-not-messaged::before { background-color: var(--status-not-started-text); }
+
+.status-badge.dm-pitch-sent {
+  background: var(--status-messaged-bg);
+  color: var(--status-messaged-text);
+}
+.status-badge.dm-pitch-sent::before { background-color: var(--status-messaged-text); }
+
+.status-badge.dm-replied {
+  background: var(--status-replied-bg);
+  color: var(--status-replied-text);
+}
+.status-badge.dm-replied::before { background-color: var(--status-replied-text); }
+
+.status-badge.dm-followed-up {
+  background: var(--status-interviewing-bg);
+  color: var(--status-interviewing-text);
+}
+.status-badge.dm-followed-up::before { background-color: var(--status-interviewing-text); }
 
 /* Text truncation */
 .text-truncate {
