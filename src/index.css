@@ -532,6 +532,28 @@ header {
   vertical-align: middle;
 }
 
+/* Sticky First Column (Company/Name) */
+.startup-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-color);
+}
+
+.startup-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: inherit;
+  border-right: 1px solid var(--border-color);
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='light'] .startup-table td:first-child {
+  box-shadow: 4px 0 8px -4px rgba(0, 0, 0, 0.1);
+}
+
 /* Spreadsheet row coloring / left indicator border based on Relevance */
 .startup-row {
   transition: background-color var(--transition-fast), transform var(--transition-fast);
@@ -545,16 +567,22 @@ header {
 /* Relevance colors applied to rows */
 .startup-row.relevance-high {
   background-color: var(--relevance-high-bg);
+}
+.startup-row.relevance-high td:first-child {
   border-left: 4px solid var(--relevance-high-row-border);
 }
 
 .startup-row.relevance-medium {
   background-color: var(--relevance-medium-bg);
+}
+.startup-row.relevance-medium td:first-child {
   border-left: 4px solid var(--relevance-medium-row-border);
 }
 
 .startup-row.relevance-low {
   background-color: var(--relevance-low-bg);
+}
+.startup-row.relevance-low td:first-child {
   border-left: 4px solid var(--relevance-low-row-border);
 }
 
